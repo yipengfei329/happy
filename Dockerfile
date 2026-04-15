@@ -39,16 +39,18 @@ RUN pnpm --filter @slopus/happy-wire build
 RUN pnpm --filter happy-server build
 
 # Stage 3: runtime
-FROM node:20-slim AS runner
+FROM node:20 AS runner
 
 WORKDIR /repo
 
 RUN apt-get update && apt-get install -y ffmpeg curl && rm -rf /var/lib/apt/lists/*
+RUN corepack enable && corepack prepare pnpm@10.11.0 --activate
 
 ENV NODE_ENV=production
 ENV DATA_DIR=/data
 ENV PGLITE_DIR=/data/pglite
 
+COPY --from=builder /repo/package.json /repo/pnpm-workspace.yaml /repo/
 COPY --from=builder /repo/node_modules /repo/node_modules
 COPY --from=builder /repo/packages/happy-wire /repo/packages/happy-wire
 COPY --from=builder /repo/packages/happy-server /repo/packages/happy-server
@@ -56,6 +58,4 @@ COPY --from=builder /repo/packages/happy-server /repo/packages/happy-server
 VOLUME /data
 EXPOSE 3005
 
-WORKDIR /repo/packages/happy-server
-
-CMD ["sh", "-c", "../../node_modules/.bin/tsx sources/standalone.ts migrate && exec ../../node_modules/.bin/tsx sources/standalone.ts serve"]
+CMD ["sh", "-c", "pnpm --filter happy-server standalone migrate && exec pnpm --filter happy-server standalone serve"]
